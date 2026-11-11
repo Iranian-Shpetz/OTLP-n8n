@@ -11,8 +11,6 @@ n8n -- OTLP/HTTP Protobuf + Bearer token --> OTel Collector
 
 Коллектор — собственная сборка OpenTelemetry Collector Builder (OCB), включающая только OTLP receiver, batch processor, OTLP/HTTP exporter и bearer-token authenticator. Адаптер принимает OTLP JSON и отправляет в ntfy только имя workflow, статус и тип ошибки. В частности, он не пересылает payload выполнения, атрибуты узлов или текст ошибки.
 
-Исходный ответ DeepSeek ошибочно утверждал, что n8n отправляет JSON: по документации n8n стандартный протокол — OTLP/HTTP Protobuf. Здесь Collector принимает Protobuf, а JSON используется только на внутреннем соединении Collector → адаптер. Упомянутая заявка на webhook exporter — закрытая заявка на функцию, а не готовый компонент или pull request: [open-telemetry/opentelemetry-collector-contrib#38496](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/38496).
-
 ## Требования
 
 - Docker Engine с Docker Compose plugin (`docker compose`).
