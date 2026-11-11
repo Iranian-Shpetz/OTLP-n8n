@@ -52,6 +52,37 @@ n8n -- OTLP/HTTP Protobuf + Bearer token --> OTel Collector
 
 После выполнения production workflow уведомление появится в выбранном ntfy topic. По умолчанию наружу опубликован только порт `4318`, привязанный к `127.0.0.1`; порт адаптера `8080` доступен лишь внутри Docker-сети.
 
+## Запуск на сервере без git clone
+
+Репозиторий также содержит [`docker-compose.server.yml`](./docker-compose.server.yml): Docker собирает оба образа непосредственно из публичного GitHub-репозитория. Сборка использует текущую ветку `main`; при первом запуске она скачает исходники и Go-модули OTel Collector.
+
+```bash
+mkdir -p otlp-n8n
+cd otlp-n8n
+curl -fsSLo compose.yaml https://raw.githubusercontent.com/Iranian-Shpetz/OTLP-n8n/main/docker-compose.server.yml
+curl -fsSLo .env.example https://raw.githubusercontent.com/Iranian-Shpetz/OTLP-n8n/main/.env.example
+cp .env.example .env
+openssl rand -hex 32
+```
+
+Запишите сгенерированный токен в `OTLP_AUTH_TOKEN` и задайте `NTFY_TOPIC` в `.env`. Если n8n работает на другом сервере, укажите `OTLP_BIND_ADDRESS=0.0.0.0`, ограничьте входящий TCP-порт `4318` в firewall адресом n8n и обеспечьте TLS для передачи токена.
+
+```bash
+docker compose -f compose.yaml config --quiet
+docker compose -f compose.yaml up -d --build
+docker compose -f compose.yaml ps
+docker compose -f compose.yaml logs -f
+```
+
+Обновление после изменений в GitHub:
+
+```bash
+curl -fsSLo compose.yaml https://raw.githubusercontent.com/Iranian-Shpetz/OTLP-n8n/main/docker-compose.server.yml
+docker compose -f compose.yaml up -d --build
+```
+
+Этот вариант **собирает образы из исходников**, а не скачивает готовые образы через `docker compose pull`: GitHub Actions пока не публикует образы в container registry.
+
 ## Сеть и безопасность
 
 - Если n8n запущен на этой же машине как процесс, используйте `http://127.0.0.1:4318`.

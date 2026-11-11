@@ -21,7 +21,9 @@ jobs:
         env:
           OTLP_AUTH_TOKEN: ci-test-token-0123456789-0123456789
           NTFY_TOPIC: ci-test-topic
-        run: docker compose config --quiet
+        run: |
+          docker compose config --quiet
+          docker compose -f docker-compose.server.yml config --quiet
       - name: Build Docker images
         env:
           OTLP_AUTH_TOKEN: ci-test-token-0123456789-0123456789
