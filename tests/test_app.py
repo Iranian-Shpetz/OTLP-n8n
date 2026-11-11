@@ -115,13 +115,16 @@ class TraceHandlerTests(unittest.TestCase):
         post.assert_not_awaited()
 
     def test_rejects_malformed_otlp_payload(self) -> None:
-        response = self.client.post(
-            "/v1/traces",
-            json={"resourceSpans": "invalid"},
-            headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
-        )
+        with self.assertLogs("ntfy_adapter", level="WARNING") as captured:
+            response = self.client.post(
+                "/v1/traces",
+                json={"resourceSpans": "private payload"},
+                headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            )
 
         self.assertEqual(response.status_code, 400)
+        self.assertIn("resourceSpans must be a list", captured.output[0])
+        self.assertNotIn("private payload", captured.output[0])
 
     def test_rejects_non_json_content_type(self) -> None:
         response = self.client.post(
