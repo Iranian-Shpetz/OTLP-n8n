@@ -1,0 +1,47 @@
+services:
+  intermediate-service:
+    build:
+      context: ./intermediate
+    restart: unless-stopped
+    environment:
+      OTLP_AUTH_TOKEN: ${OTLP_AUTH_TOKEN:?Set OTLP_AUTH_TOKEN in .env}
+      NTFY_TOPIC: ${NTFY_TOPIC:?Set NTFY_TOPIC in .env}
+      NTFY_URL: ${NTFY_URL:-https://ntfy.sh}
+      NTFY_TOKEN: ${NTFY_TOKEN:-}
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    expose:
+      - "8080"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - from urllib.request import urlopen; urlopen('http://127.0.0.1:8080/healthz', timeout=2).read()
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  otel-collector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      OTLP_AUTH_TOKEN: ${OTLP_AUTH_TOKEN:?Set OTLP_AUTH_TOKEN in .env}
+    depends_on:
+      intermediate-service:
+        condition: service_healthy
+    ports:
+      - "${OTLP_BIND_ADDRESS:-127.0.0.1}:${OTLP_HTTP_PORT:-4318}:4318"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

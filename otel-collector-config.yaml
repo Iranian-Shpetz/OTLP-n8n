@@ -1,0 +1,38 @@
+extensions:
+  bearertokenauth:
+    token: ${env:OTLP_AUTH_TOKEN}
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: bearertokenauth
+
+processors:
+  batch:
+
+exporters:
+  otlp_http:
+    endpoint: http://intermediate-service:8080
+    encoding: json
+    headers:
+      authorization: "Bearer ${env:OTLP_AUTH_TOKEN}"
+    timeout: 10s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    sending_queue:
+      enabled: true
+      queue_size: 1000
+
+service:
+  extensions: [bearertokenauth]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_http]
