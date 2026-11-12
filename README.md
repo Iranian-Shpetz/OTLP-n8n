@@ -9,7 +9,7 @@ n8n -- OTLP/HTTP Protobuf + Bearer token --> OTel Collector
     -- OTLP/HTTP JSON по внутренней Docker-сети --> адаптер --> ntfy
 ```
 
-Коллектор — собственная сборка OpenTelemetry Collector Builder (OCB), включающая только OTLP receiver, batch processor, OTLP/HTTP exporter и bearer-token authenticator. Адаптер принимает OTLP JSON и отправляет в ntfy только имя workflow, статус и тип ошибки. В частности, он не пересылает payload выполнения, атрибуты узлов или текст ошибки.
+Коллектор — собственная сборка OpenTelemetry Collector Builder (OCB), включающая только OTLP receiver, batch processor, OTLP/HTTP exporter и bearer-token authenticator. Адаптер принимает OTLP JSON, в том числе gzip-сжатый, и отправляет в ntfy только имя workflow, статус и тип ошибки. В частности, он не пересылает payload выполнения, атрибуты узлов или текст ошибки.
 
 ## Требования
 

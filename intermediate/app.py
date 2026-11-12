@@ -1,8 +1,11 @@
+import gzip
 import hmac
+import io
 import json
 import logging
 import os
 import re
+import zlib
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -156,6 +159,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if content_type != "application/json":
             raise HTTPException(status_code=415, detail="Expected application/json")
 
+        content_encoding = request.headers.get("content-encoding", "identity").strip().lower()
+        if content_encoding not in {"identity", "gzip"}:
+            raise HTTPException(status_code=415, detail="Unsupported Content-Encoding")
+
         content_length = request.headers.get("content-length")
         if content_length is not None:
             try:
@@ -168,19 +175,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if len(body) > MAX_BODY_BYTES:
             raise HTTPException(status_code=413, detail="Request body is too large")
 
+        if content_encoding == "gzip":
+            try:
+                with gzip.GzipFile(fileobj=io.BytesIO(body), mode="rb") as compressed_body:
+                    body = compressed_body.read(MAX_BODY_BYTES + 1)
+            except (OSError, EOFError, zlib.error) as exc:
+                logger.warning("Rejected invalid gzip-compressed OTLP trace payload")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid gzip-compressed OTLP trace payload",
+                ) from exc
+            if len(body) > MAX_BODY_BYTES:
+                raise HTTPException(status_code=413, detail="Request body is too large")
+
         try:
             payload = json.loads(body)
             events = extract_workflow_events(payload)
         except UnicodeDecodeError as exc:
-            content_encoding = request.headers.get("content-encoding", "identity")
-            gzip_signature = body.startswith(b"\x1f\x8b")
-            logger.warning(
-                "Rejected OTLP trace payload with invalid UTF-8 at byte %d "
-                "(content-encoding=%s, gzip-signature=%s)",
-                exc.start,
-                content_encoding,
-                gzip_signature,
-            )
+            logger.warning("Rejected OTLP trace payload with invalid UTF-8 at byte %d", exc.start)
             raise HTTPException(status_code=400, detail="Invalid OTLP trace payload") from exc
         except json.JSONDecodeError as exc:
             logger.warning(

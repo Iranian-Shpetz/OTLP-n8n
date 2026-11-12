@@ -1,10 +1,12 @@
+import gzip
+import json
 import unittest
 from unittest.mock import AsyncMock, patch
 
 import httpx
 from fastapi.testclient import TestClient
 
-from intermediate.app import Settings, create_app, extract_workflow_events
+from intermediate.app import MAX_BODY_BYTES, Settings, create_app, extract_workflow_events
 
 AUTH_TOKEN = "test-token-" + ("a" * 32)
 SETTINGS = Settings(
@@ -114,6 +116,46 @@ class TraceHandlerTests(unittest.TestCase):
         self.assertEqual(response.json(), {})
         post.assert_not_awaited()
 
+    @patch("intermediate.app.httpx.AsyncClient.post", new_callable=AsyncMock)
+    def test_accepts_gzip_compressed_otlp_json_with_unicode(self, post: AsyncMock) -> None:
+        post.return_value = httpx.Response(
+            200,
+            request=httpx.Request("POST", "https://ntfy.sh/test-topic"),
+        )
+        payload = otlp_payload()
+        payload["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["attributes"][0]["value"][
+            "stringValue"
+        ] = "Резервная копия"
+        compressed_body = gzip.compress(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
+
+        response = self.client.post(
+            "/v1/traces",
+            content=compressed_body,
+            headers={
+                "Authorization": f"Bearer {AUTH_TOKEN}",
+                "Content-Type": "application/json",
+                "Content-Encoding": "gzip",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {})
+        post.assert_awaited_once()
+        self.assertIn("Резервная копия", post.await_args.kwargs["content"].decode("utf-8"))
+
+    def test_rejects_gzip_payload_over_decompressed_size_limit(self) -> None:
+        response = self.client.post(
+            "/v1/traces",
+            content=gzip.compress(b" " * (MAX_BODY_BYTES + 1)),
+            headers={
+                "Authorization": f"Bearer {AUTH_TOKEN}",
+                "Content-Type": "application/json",
+                "Content-Encoding": "gzip",
+            },
+        )
+
+        self.assertEqual(response.status_code, 413)
+
     def test_rejects_malformed_otlp_payload(self) -> None:
         with self.assertLogs("ntfy_adapter", level="WARNING") as captured:
             response = self.client.post(
@@ -124,24 +166,6 @@ class TraceHandlerTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("resourceSpans must be a list", captured.output[0])
-        self.assertNotIn("private payload", captured.output[0])
-
-    def test_logs_gzip_signature_for_invalid_utf8_without_logging_body(self) -> None:
-        body = b"\x1f\x8bprivate payload"
-
-        with self.assertLogs("ntfy_adapter", level="WARNING") as captured:
-            response = self.client.post(
-                "/v1/traces",
-                content=body,
-                headers={
-                    "Authorization": f"Bearer {AUTH_TOKEN}",
-                    "Content-Type": "application/json",
-                },
-            )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("content-encoding=identity", captured.output[0])
-        self.assertIn("gzip-signature=True", captured.output[0])
         self.assertNotIn("private payload", captured.output[0])
 
     def test_rejects_non_json_content_type(self) -> None:
