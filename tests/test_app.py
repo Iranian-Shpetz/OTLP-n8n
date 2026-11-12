@@ -126,6 +126,24 @@ class TraceHandlerTests(unittest.TestCase):
         self.assertIn("resourceSpans must be a list", captured.output[0])
         self.assertNotIn("private payload", captured.output[0])
 
+    def test_logs_gzip_signature_for_invalid_utf8_without_logging_body(self) -> None:
+        body = b"\x1f\x8bprivate payload"
+
+        with self.assertLogs("ntfy_adapter", level="WARNING") as captured:
+            response = self.client.post(
+                "/v1/traces",
+                content=body,
+                headers={
+                    "Authorization": f"Bearer {AUTH_TOKEN}",
+                    "Content-Type": "application/json",
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("content-encoding=identity", captured.output[0])
+        self.assertIn("gzip-signature=True", captured.output[0])
+        self.assertNotIn("private payload", captured.output[0])
+
     def test_rejects_non_json_content_type(self) -> None:
         response = self.client.post(
             "/v1/traces",

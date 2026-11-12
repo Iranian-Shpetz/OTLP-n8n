@@ -172,7 +172,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             payload = json.loads(body)
             events = extract_workflow_events(payload)
         except UnicodeDecodeError as exc:
-            logger.warning("Rejected OTLP trace payload with invalid UTF-8 at byte %d", exc.start)
+            content_encoding = request.headers.get("content-encoding", "identity")
+            gzip_signature = body.startswith(b"\x1f\x8b")
+            logger.warning(
+                "Rejected OTLP trace payload with invalid UTF-8 at byte %d "
+                "(content-encoding=%s, gzip-signature=%s)",
+                exc.start,
+                content_encoding,
+                gzip_signature,
+            )
             raise HTTPException(status_code=400, detail="Invalid OTLP trace payload") from exc
         except json.JSONDecodeError as exc:
             logger.warning(
