@@ -106,14 +106,16 @@ class TraceHandlerTests(unittest.TestCase):
     def test_returns_otlp_success_for_batches_without_workflow_spans(
         self, post: AsyncMock
     ) -> None:
-        response = self.client.post(
-            "/v1/traces",
-            json={"resourceSpans": []},
-            headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
-        )
+        with self.assertLogs("ntfy_adapter", level="INFO") as captured:
+            response = self.client.post(
+                "/v1/traces",
+                json={"resourceSpans": []},
+                headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {})
+        self.assertIn("no workflow.execute spans", captured.output[0])
         post.assert_not_awaited()
 
     @patch("intermediate.app.httpx.AsyncClient.post", new_callable=AsyncMock)
@@ -128,18 +130,20 @@ class TraceHandlerTests(unittest.TestCase):
         ] = "Резервная копия"
         compressed_body = gzip.compress(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
 
-        response = self.client.post(
-            "/v1/traces",
-            content=compressed_body,
-            headers={
-                "Authorization": f"Bearer {AUTH_TOKEN}",
-                "Content-Type": "application/json",
-                "Content-Encoding": "gzip",
-            },
-        )
+        with self.assertLogs("ntfy_adapter", level="INFO") as captured:
+            response = self.client.post(
+                "/v1/traces",
+                content=compressed_body,
+                headers={
+                    "Authorization": f"Bearer {AUTH_TOKEN}",
+                    "Content-Type": "application/json",
+                    "Content-Encoding": "gzip",
+                },
+            )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {})
+        self.assertIn("Delivered 1 workflow notification(s) to ntfy", captured.output[0])
         post.assert_awaited_once()
         self.assertIn("Резервная копия", post.await_args.kwargs["content"].decode("utf-8"))
 

@@ -207,6 +207,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=400, detail="Invalid OTLP trace payload") from exc
 
         if not events:
+            logger.info("Accepted OTLP trace batch with no workflow.execute spans")
             return Response(content="{}", media_type="application/json")
 
         headers = {"Title": "n8n workflow", "Tags": "opentelemetry"}
@@ -233,6 +234,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         detail="Failed to deliver notification",
                     ) from exc
 
+        logger.info("Delivered %d workflow notification(s) to ntfy", len(events))
         return Response(content="{}", media_type="application/json")
 
     return app
