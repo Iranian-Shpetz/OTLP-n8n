@@ -106,7 +106,7 @@ class TraceHandlerTests(unittest.TestCase):
     def test_returns_otlp_success_for_batches_without_workflow_spans(
         self, post: AsyncMock
     ) -> None:
-        with self.assertLogs("ntfy_adapter", level="INFO") as captured:
+        with self.assertLogs("uvicorn.error", level="INFO") as captured:
             response = self.client.post(
                 "/v1/traces",
                 json={"resourceSpans": []},
@@ -130,7 +130,7 @@ class TraceHandlerTests(unittest.TestCase):
         ] = "Резервная копия"
         compressed_body = gzip.compress(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
 
-        with self.assertLogs("ntfy_adapter", level="INFO") as captured:
+        with self.assertLogs("uvicorn.error", level="INFO") as captured:
             response = self.client.post(
                 "/v1/traces",
                 content=compressed_body,
@@ -161,7 +161,7 @@ class TraceHandlerTests(unittest.TestCase):
         self.assertEqual(response.status_code, 413)
 
     def test_rejects_malformed_otlp_payload(self) -> None:
-        with self.assertLogs("ntfy_adapter", level="WARNING") as captured:
+        with self.assertLogs("uvicorn.error", level="WARNING") as captured:
             response = self.client.post(
                 "/v1/traces",
                 json={"resourceSpans": "private payload"},

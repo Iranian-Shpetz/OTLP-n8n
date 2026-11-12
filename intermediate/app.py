@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
 
-logger = logging.getLogger("ntfy_adapter")
+logger = logging.getLogger("uvicorn.error")
 MAX_BODY_BYTES = 4 * 1024 * 1024
 TOPIC_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
